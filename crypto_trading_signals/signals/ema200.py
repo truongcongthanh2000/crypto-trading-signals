@@ -16,7 +16,7 @@ class EMA200Signal(SignalBase):
         super().__init__(config, logger)
         self.cache = {}  # {(symbol, interval): df}
         self.limit = 1440 # https://www.reddit.com/r/binance/comments/pb6lq9/calculating_ema200_from_binance_api/
-        self.threshold = 0.002    # 0.2% distance near EMA200
+        self.threshold = 0.01    # 1% distance near EMA200
         self.lookback = 21       # candles for mean check
 
     async def preload(self, exchange: binanceusdm, symbols, intervals):
@@ -30,7 +30,7 @@ class EMA200Signal(SignalBase):
                     df = pd.DataFrame(candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
                     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
                     self.cache[(symbol, interval)] = df
-                    self.logger.info(f"Preloaded {len(df)} candles for {symbol} {interval}")
+                    self.logger.debug(f"Preloaded {len(df)} candles for {symbol} {interval}")
                 except Exception as e:
                     self.logger.error(f"Error preloading {symbol} {interval}: {e}")
 

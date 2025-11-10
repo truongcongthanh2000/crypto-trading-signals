@@ -15,7 +15,7 @@ class Logger:
         log_queue = queue.SimpleQueue() # shared Queue, infinite size
         queue_handler = logging.handlers.QueueHandler(log_queue)
         self.Logger = logging.getLogger(logging_service)
-        self.Logger.setLevel(logging.INFO)
+        self.Logger.setLevel(logging.DEBUG)
         self.Logger.propagate = False
         self.Logger.addHandler(queue_handler)
 
@@ -34,7 +34,7 @@ class Logger:
         # self.Logger.addHandler(ch)
 
         queue_listener = logging.handlers.QueueListener(
-            log_queue, fh, sh
+            log_queue, fh, sh, respect_handler_level=True
         )
         queue_listener.start()
         # notification handler

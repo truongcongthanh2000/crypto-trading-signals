@@ -1,6 +1,7 @@
 import asyncio
 import ccxt.pro
 import ccxt.async_support
+from .core.notification import Message
 from .core.config import Config
 from .core.logger import Logger
 from .signals.base import SignalBase
@@ -8,6 +9,9 @@ from .signals.ema200 import EMA200Signal
 import pytz
 from datetime import datetime
 from .util import convert_to_seconds
+import requests
+import json
+import time
 
 class SignalEngine:
     def __init__(self, config: Config, logger: Logger):
@@ -40,8 +44,19 @@ class SignalEngine:
             key=lambda s: tickers[s]["quoteVolume"] if s in tickers else 0,
             reverse=True
         )[:self.config.TOP_SYMBOLS]
+        for symbol in self.config.WHITELIST_SYMBOLS:
+            if symbol not in symbol_ids:
+                symbol_ids.append(symbol)
         self.symbol_ids = symbol_ids
-        self.logger.info(f"Loaded top {len(symbol_ids)} symbols: {symbol_ids}")
+        
+        public_ip = requests.get('https://api.ipify.org').text
+        title = f"👋 Start Signals Trade - Time: {datetime.fromtimestamp(int(time.time()), tz=pytz.timezone(self.config.TIMEZONE))}"
+        body = f"**Your server public IP is `{public_ip}`**\n"
+        config_dict = self.config.beautify()
+        config_dict["SYMBOLS_SIZE"] = len(symbol_ids)
+        body += f"```\n{json.dumps(config_dict, indent=2)}"
+        self.logger.info(Message(body=body, title=title, chat_id=self.config.TELEGRAM_LOG_PEER_ID), notification=True)
+        self.logger.info(f"Loaded {len(symbol_ids)} symbols: {symbol_ids}")
 
     # ---------------- Step 2: Preload historical candles ----------------
     async def preload_historical(self):
@@ -83,6 +98,9 @@ class SignalEngine:
     # ---------------- Step 4: Run engine ----------------
     async def run(self):
         await self.get_top_symbols()
+        if len(self.symbol_ids) == 0:
+            self.logger.warning("Empty list of symbols")
+            return
         await self.preload_historical()
         await self.run_realtime()
 

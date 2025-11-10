@@ -21,10 +21,13 @@ class Config:
         # General
         self.TIMEZONE = os.environ.get("TIMEZONE", "Asia/Ho_Chi_Minh")
         self.TOP_SYMBOLS = int(os.environ.get("TOP_SYMBOLS", 5))
+        self.WHITELIST_SYMBOLS = [symbol.strip() for symbol in os.environ.get("WHITELIST_SYMBOLS", "").split() if symbol.strip()]
         self.INTERVALS = [interval.strip() for interval in os.environ.get("INTERVALS", "15m 1h 4h").split() if interval.strip()]
 
     def beautify(self):
         response = {}
+        for k, v in vars(self).items():
+            response[k] = v
         response["platform"] = platform.system()
         response["BINANCE_API_KEY"] = "...."
         response["BINANCE_API_SECRET"] = "...."
