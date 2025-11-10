@@ -127,7 +127,7 @@ class EMA200Signal(SignalBase):
                 figsize=(8, 5),
                 returnfig=True,
                 tight_layout=True,
-                ylim=(ymin * 0.998, ymax * 1.002),  # thêm chút padding 0.2%
+                ylim=(ymin * 0.998, ymax * 1.002),
             )
             axlist[0].set_title(f"{symbol} {interval} - Near EMA200 {signal}")
             fig.savefig(buf, format="png", bbox_inches="tight")

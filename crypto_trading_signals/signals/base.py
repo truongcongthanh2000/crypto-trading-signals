@@ -8,7 +8,7 @@ class SignalBase(ABC):
         self.logger = logger
 
     @abstractmethod
-    def preload(self, exchange, symbols, intervals):
+    async def preload(self, exchange, symbols, intervals):
         """Load historical candles. Must be implemented by subclasses."""
         pass
     
