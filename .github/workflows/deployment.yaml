@@ -32,5 +32,5 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           pm2 delete crypto-signals || true
-          RUNNER_TRACKING_ID="" pm2 start "python3 -m crypto_trading_signals" --namespace crypto-signals
+          RUNNER_TRACKING_ID="" pm2 start ".venv/bin/python3 -m crypto_trading_signals" --name crypto-signals --namespace crypto-signals
           pm2 save --namespace crypto-signals
