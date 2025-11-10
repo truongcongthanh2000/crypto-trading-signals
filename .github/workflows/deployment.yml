@@ -1,0 +1,36 @@
+name: crypto-trading-signals
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "Installing system dependencies inside: $(pwd)"
+          bash install.sh
+
+      - name: Create local .env 
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "Creating local .env in $(pwd)"
+          touch .env
+          echo "${{ secrets.ENV_FILE }}" > .env
+          echo ".env created successfully."
+
+      - name: Start with PM2
+        working-directory: ${{ github.workspace }}
+        run: |
+          pm2 delete crypto-signals || true
+          RUNNER_TRACKING_ID="" pm2 start "python3 -m crypto_trading_signals" --namespace crypto-signals
+          pm2 save --namespace crypto-signals
