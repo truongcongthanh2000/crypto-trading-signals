@@ -1,5 +1,5 @@
 import pandas as pd
-from ta.trend import EMAIndicator
+import talib
 from crypto_trading_signals.core.logger import Logger
 from crypto_trading_signals.core.config import Config
 from crypto_trading_signals.core.notification import Message
@@ -15,7 +15,7 @@ class EMA200Signal(SignalBase):
     def __init__(self, config: Config, logger: Logger):
         super().__init__(config, logger)
         self.cache = {}  # {(symbol, interval): df}
-        self.limit = 500
+        self.limit = 1440 # https://www.reddit.com/r/binance/comments/pb6lq9/calculating_ema200_from_binance_api/
         self.threshold = 0.002    # 0.2% distance near EMA200
         self.lookback = 21       # candles for mean check
 
@@ -68,8 +68,9 @@ class EMA200Signal(SignalBase):
         self.cache[key] = df
 
         # Compute EMA200
-        ema200 = EMAIndicator(df["close"], window=200).ema_indicator()
-        ema_value = ema200.iloc[-1]
+        closed_prices = df["close"].values[:-1]
+        ema200 = talib.EMA(closed_prices, timeperiod=200)
+        ema_value = ema200[-1]
         last_close = df["close"].iloc[-1]
 
         # Compute distance ratio
@@ -90,7 +91,7 @@ class EMA200Signal(SignalBase):
     
         if signal:
             df_chart = df.tail(self.lookback).copy()
-            df_chart["EMA200"] = ema200.tail(self.lookback).values
+            df_chart["EMA200"] = ema200[-self.lookback:]
             df_chart.set_index("timestamp", inplace=True)
 
             ymin = min(df_chart['low'].min(), df_chart['EMA200'].min())
