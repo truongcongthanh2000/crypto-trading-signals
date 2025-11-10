@@ -1,0 +1,7 @@
+__pycache__
+.vscode
+logs/signals_trade_server.log
+cookies.json
+cookies_raw.json
+.venv
+.env*
