@@ -10,13 +10,14 @@ import pytz
 from io import BytesIO
 from datetime import datetime
 import matplotlib.pyplot as plt
+from PIL import Image
 
 class EMA200Signal(SignalBase):
     def __init__(self, config: Config, logger: Logger):
         super().__init__(config, logger)
         self.cache = {}  # {(symbol, interval): df}
         self.limit = 1440 # https://www.reddit.com/r/binance/comments/pb6lq9/calculating_ema200_from_binance_api/
-        self.threshold = 0.01    # 1% distance near EMA200
+        self.threshold = 0.005    # 0.5% distance near EMA200
         self.lookback = 21       # candles for mean check
 
     async def preload(self, exchange: binanceusdm, symbols, intervals):
@@ -92,6 +93,10 @@ class EMA200Signal(SignalBase):
         if signal:
             df_chart = df.tail(self.lookback).copy()
             df_chart["EMA200"] = ema200[-self.lookback:]
+
+            df_chart["timestamp"] = pd.to_datetime(df_chart["timestamp"], utc=True)
+            df_chart["timestamp"] = df_chart["timestamp"].dt.tz_convert(self.config.TIMEZONE)
+
             df_chart.set_index("timestamp", inplace=True)
 
             ymin = min(df_chart['low'].min(), df_chart['EMA200'].min())
@@ -131,9 +136,15 @@ class EMA200Signal(SignalBase):
                 ylim=(ymin * 0.998, ymax * 1.002),
             )
             axlist[0].set_title(f"{symbol} {interval} - Near EMA200 {signal}")
-            fig.savefig(buf, format="png", bbox_inches="tight")
+            fig.savefig(buf, format="png", bbox_inches="tight", dpi=80)
             plt.close(fig)
             buf.seek(0)
+
+            img = Image.open(buf).convert("RGB")
+            compressed_buf = BytesIO()
+            img.save(compressed_buf, format="JPEG", optimize=True, quality=70)
+            compressed_buf.seek(0)
+            buf.close()
 
             # Build message
             body = (
@@ -149,7 +160,7 @@ class EMA200Signal(SignalBase):
                 body=body,
                 chat_id=self.config.TELEGRAM_CHAT_ID,
                 title=title,
-                image=buf
+                image=compressed_buf
             )
 
 

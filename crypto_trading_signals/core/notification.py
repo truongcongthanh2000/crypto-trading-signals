@@ -9,11 +9,12 @@ from telegram import (
     LinkPreviewOptions
 )
 from telegram.constants import ParseMode
-from telegram.error import TelegramError
-from telegram.request import HTTPXRequest
+from telegram.error import TelegramError, RetryAfter, TimedOut, NetworkError
 from .config import Config
 import telegramify_markdown
 import io
+from asyncio import Semaphore
+import traceback
 
 class Message:
     def __init__(self, body: str, chat_id: int = 0, title = 'Signals Trade', format: str | None = ParseMode.MARKDOWN_V2, image: str | io.BytesIO | None = None, images: list[str] | list[io.BytesIO] | None = None, group_message_id: int | None = None):
@@ -45,8 +46,9 @@ class NotificationHandler:
             self.config = cfg
             self.queue = asyncio.Queue()
             self.enabled = True
-
             self.bot = Bot(token=cfg.TELEGRAM_BOT_TOKEN)
+            self.semaphore = Semaphore(1)
+            self.min_delay = 2
         else:
             self.enabled = False
 
@@ -100,10 +102,29 @@ class NotificationHandler:
                 link_preview_options=LinkPreviewOptions(is_disabled=True)
             )
 
+    async def _send_message(self, message: Message, retries=3):
+        async with self.semaphore:
+            for attempt in range(retries):
+                try:
+                    await self.notify(message)
+                    return
+                except RetryAfter as e:
+                    await asyncio.sleep(e.retry_after + 1)
+                except (TimedOut, NetworkError):
+                    await asyncio.sleep(5)
+
     async def process_queue(self):
         while True:
             message: Message = await self.queue.get()
-            await self.notify(message)
+            try:
+                await self._send_message(message)
+            except Exception as e:
+                print(f"[NotificationHandler] Failed to send message: {e}")
+                traceback.print_exc()
+            finally:
+                self.queue.task_done()
+            # Delay to respect rate limit
+            await asyncio.sleep(self.min_delay)
 
     def send_notification(self, message: Message, attachments=None):
         if self.enabled:
