@@ -15,7 +15,7 @@ from PIL import Image
 class EMA200Signal(SignalBase):
     def __init__(self, config: Config, logger: Logger):
         super().__init__(config, logger)
-        self.cache = {}  # {(symbol, interval): df}
+        self.cache = {}  # {(symbol, interval): {df, EMA200}}
         self.limit = 1440 # https://www.reddit.com/r/binance/comments/pb6lq9/calculating_ema200_from_binance_api/
         self.threshold = 0.005    # 0.5% distance near EMA200
         self.lookback = 21       # candles for mean check
@@ -30,8 +30,18 @@ class EMA200Signal(SignalBase):
                     candles = await exchange.fetch_ohlcv(symbol, interval, limit=self.limit)
                     df = pd.DataFrame(candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
                     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-                    self.cache[(symbol, interval)] = df
-                    self.logger.debug(f"Preloaded {len(df)} candles for {symbol} {interval}")
+
+                    # Precompute EMA200
+                    closed_prices = df["close"].values[:-1]
+                    ema200 = talib.EMA(closed_prices, timeperiod=200)
+
+                    # Store in cache
+                    self.cache[(symbol, interval)] = {
+                        "df": df,
+                        "ema200": ema200
+                    }
+
+                    self.logger.debug(f"Preloaded {len(df)} candles and EMA200 for {symbol} {interval}")
                 except Exception as e:
                     self.logger.error(f"Error preloading {symbol} {interval}: {e}")
 
@@ -44,7 +54,9 @@ class EMA200Signal(SignalBase):
         if key not in self.cache:
             return None
         
-        df = self.cache[key]
+        cache_entry = self.cache[key]
+        df = cache_entry["df"]
+        ema200 = cache_entry["ema200"]
 
         # Prepare last candle
         last_ts = pd.to_datetime(last_candle[0], unit="ms")
@@ -60,17 +72,20 @@ class EMA200Signal(SignalBase):
         if df["timestamp"].iloc[-1] < last_ts:
             # New candle → append
             df = pd.concat([df, new_row], ignore_index=True)
+            df = df.tail(self.limit).reset_index(drop=True)
+
+            # Recalculate EMA only once per new candle
+            closed_prices = df["close"].values[:-1]
+            ema200 = talib.EMA(closed_prices, timeperiod=200)
+            cache_entry["ema200"] = ema200
+            cache_entry["df"] = df
         elif df["timestamp"].iloc[-1] == last_ts:
             # Same candle → update last row
             df.iloc[-1] = new_row.iloc[0]
+            cache_entry["df"] = df
 
-        # Keep only last limits candles
-        df = df.tail(self.limit).reset_index(drop=True)
-        self.cache[key] = df
+        self.cache[key] = cache_entry
 
-        # Compute EMA200
-        closed_prices = df["close"].values[:-1]
-        ema200 = talib.EMA(closed_prices, timeperiod=200)
         ema_value = ema200[-1]
         last_close = df["close"].iloc[-1]
 
