@@ -1,4 +1,4 @@
-# Crypto Trading Signals
+# Crypto Trading Signals 
 
 **Crypto Trading Signals** is an automated system for generating and sending trading signals based on technical indicators. It supports multiple cryptocurrency symbols, real-time data from Binance Futures, and Telegram notifications with charts.
 
